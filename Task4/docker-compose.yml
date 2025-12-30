@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chroma_db
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma_db
+      - ANONYMIZED_TELEMETRY=FALSE
+      - ALLOW_RESET=TRUE
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./chroma_data:/chroma/chroma_db
+    networks:
+      - rag_net
+
+  indexer:
+    build: ./indexer/
+    container_name: index_builder
+    depends_on:
+      - chromadb
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+      - ./cache:/app/cache  # Монтируем кэш на хост
+      - ./chroma_data:/app/chroma_data
+    networks:
+      - rag_net
+    command: ["python", "query_index.py"]
+
+  rag-bot:
+    depends_on:
+      - chromadb
+    build: ./rag-bot/
+    volumes:
+      - ./models:/app/models
+      - ./cache:/app/cache
+    networks:
+      - rag_net
+
+networks:
+  rag_net:
+    driver: bridge
